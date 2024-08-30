@@ -21,4 +21,11 @@ public class GlobalExceptionHandler {
                 "Bad Request: " + ex.getMessage()
         );
     }
+
+    @ExceptionHandler(InvalidJokeException.class)
+    public ResponseEntity<String> invalidJokeException(InvalidJokeException ex) {
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).body(
+                "No Content: " + ex.getMessage()
+        );
+    }
 }

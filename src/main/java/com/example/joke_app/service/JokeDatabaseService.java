@@ -2,6 +2,7 @@ package com.example.joke_app.service;
 
 import com.example.joke_app.Repo.JokeRepository;
 import com.example.joke_app.dto.JokeDto;
+import com.example.joke_app.exception.InvalidJokeException;
 import com.example.joke_app.model.Joke;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,9 +18,14 @@ public class JokeDatabaseService {
     public void saveJokes(List<JokeDto> jokesDto) {
 
         if (jokesDto == null || jokesDto.isEmpty()) {
-            return;
+            throw new InvalidJokeException("No Jokes are present");
         }
-        List<Joke> jokesToSave = jokesDto.stream().map(Joke::new).toList();
+
+        List<Joke> jokesToSave = jokesDto.stream()
+                .map(Joke::new)
+                .filter(joke -> !jokeRepository.existsById(joke.getId()))  // Assuming 'id' is the unique identifier
+                .toList();
+
         jokeRepository.saveAll(jokesToSave);
     }
 }

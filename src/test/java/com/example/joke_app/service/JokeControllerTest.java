@@ -3,6 +3,8 @@ package com.example.joke_app.service;
 import com.example.joke_app.controller.JokeController;
 import com.example.joke_app.dto.DataDtoRes;
 import com.example.joke_app.dto.JokeDto;
+import com.example.joke_app.exception.GlobalExceptionHandler;
+import com.example.joke_app.exception.InvalidJokeException;
 import com.example.joke_app.exception.JokeFetchException;
 import com.example.joke_app.exception.ValidCountException;
 import org.junit.jupiter.api.Test;
@@ -11,7 +13,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 import java.util.Arrays;
@@ -35,6 +42,9 @@ public class JokeControllerTest {
 
     @InjectMocks
     private JokeController jokeController;
+
+    @MockBean
+    private JokeDatabaseService jokeDatabaseService;
 
     @Test
     public void testGetJokes_ReturnsJokesList() throws Exception {
@@ -68,4 +78,5 @@ public class JokeControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Bad Request: Count should be greater than zero"));
     }
+
 }
