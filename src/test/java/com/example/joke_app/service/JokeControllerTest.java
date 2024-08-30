@@ -3,27 +3,28 @@ package com.example.joke_app.service;
 import com.example.joke_app.controller.JokeController;
 import com.example.joke_app.dto.DataDtoRes;
 import com.example.joke_app.dto.JokeDto;
-import com.example.joke_app.model.Joke;
+import com.example.joke_app.exception.JokeFetchException;
+import com.example.joke_app.exception.ValidCountException;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 import java.util.Arrays;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
 @AutoConfigureMockMvc
+@WebMvcTest(JokeController.class)
 public class JokeControllerTest {
 
     @Autowired
@@ -40,7 +41,7 @@ public class JokeControllerTest {
         List<List<JokeDto>> mockJokes = List.of(
                 Arrays.asList(new JokeDto(1L, "Setup 1", "Punchline 1", "type 1"), new JokeDto(2L, "Setup 2", "Punchline 2","type 2")));
 
-        when(jokeService.getJokes(2)).thenReturn(ResponseEntity.ok(new DataDtoRes(mockJokes)));
+        when(jokeService.getJokes(2)).thenReturn(new DataDtoRes(mockJokes));
 
         mockMvc.perform(get("/jokes?count=2"))
                 .andExpect(status().isOk())
@@ -51,32 +52,20 @@ public class JokeControllerTest {
     }
 
     @Test
-    public void testGetJokes_ReturnsError_WhenServiceFails() throws Exception {
-        when(jokeService.getJokes(2)).thenThrow(new RuntimeException("Service failed"));
+    public void testGetJokes_ThrowsJokeFetchException() throws Exception {
+        when(jokeService.getJokes(anyInt())).thenThrow(new JokeFetchException("External API failed"));
 
         mockMvc.perform(get("/jokes?count=2"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(content().string("Service failed: External API failed"));
     }
 
     @Test
-    public void testGetJokesById_ReturnsJoke() throws Exception {
-        Joke mockJoke = new Joke(1L, "setup", "punchline", "type");
-        when(jokeService.getJokesById(1L)).thenReturn(ResponseEntity.ok(mockJoke));
+    public void testGetJokes_ThrowsValidCountException() throws Exception {
+        when(jokeService.getJokes(anyInt())).thenThrow(new ValidCountException("Count should be greater than zero"));
 
-        mockMvc.perform(get("/joke")
-                        .param("id", "1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1L))
-                .andExpect(jsonPath("$.setup").value("setup"))
-                .andExpect(jsonPath("$.punchline").value("punchline"));
-    }
-
-    @Test
-    public void testGetJokesById_NotFound() throws Exception {
-        when(jokeService.getJokesById(1L)).thenReturn(new ResponseEntity<>(HttpStatus.NOT_FOUND));
-
-        mockMvc.perform(get("/joke").param("id", "1"))
-                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/jokes?count=0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Bad Request: Count should be greater than zero"));
     }
 }
-

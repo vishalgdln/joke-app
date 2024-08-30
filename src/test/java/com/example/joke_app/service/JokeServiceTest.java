@@ -4,18 +4,19 @@ import com.example.joke_app.Repo.JokeRepository;
 import com.example.joke_app.dto.DataDtoRes;
 import com.example.joke_app.dto.JokeDto;
 import com.example.joke_app.exception.JokeFetchException;
-import com.example.joke_app.model.Joke;
+import com.example.joke_app.exception.ValidCountException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -34,59 +35,76 @@ public class JokeServiceTest {
     @Mock
     private JokeRepository jokeRepository;
 
+    @Mock
+    private JokeDatabaseService jokeDatabaseService;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+    }
+
     @Test
     public void testGetJokes_ReturnsCorrectNumberOfJokes() {
+        JokeDto mockJoke = new JokeDto(1L, "Setup Joke", "Punchline Joke", "type");
+        when(restTemplate.getForEntity(anyString(), eq(JokeDto.class))).thenReturn(ResponseEntity.ok(mockJoke));
+        doNothing().when(jokeDatabaseService).saveJokes(anyList());
+        DataDtoRes mockResponse = jokeService.getJokes(12);
 
-        JokeDto mockJoke = new JokeDto(1L,"Setup Joke", "Punchline Joke", "type");
+        assertEquals(2, mockResponse.getJokes().size());  // 2 batches
+        assertEquals(12, mockResponse.getJokes().stream().mapToInt(List::size).sum());
 
-        when(restTemplate.getForObject(anyString(), eq(JokeDto.class))).thenReturn(mockJoke);
-        when(jokeRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        ResponseEntity<DataDtoRes> mockResponse = jokeService.getJokes(19);
+        verify(restTemplate, times(12)).getForEntity(anyString(), eq(JokeDto.class));
+        verify(jokeDatabaseService, times(2)).saveJokes(anyList());
+    }
 
-        assertEquals(2, mockResponse.getBody().getJokes().size());
-        assertEquals(19,mockResponse.getBody().getJokes().stream().mapToInt(List::size).sum());
-        verify(restTemplate, times(19)).getForObject(anyString(), eq(JokeDto.class));
+    @Test
+    public void testGetJokes_fetchJokesInBatch_StatusIsNotOk() {
+        when(restTemplate.getForEntity(anyString(), eq(JokeDto.class)))
+                .thenReturn(ResponseEntity.badRequest().body(new JokeDto()));
+        assertThrows(JokeFetchException.class, () -> jokeService.getJokes(12));
     }
 
     @Test
     public void testGetJokes_ReturnsEmptyList_WhenApiFails() {
-        when(restTemplate.getForObject(anyString(), eq(JokeDto.class))).thenThrow(new JokeFetchException("Server not available. Try after later."));
-        Exception exception = assertThrows(JokeFetchException.class, () -> {
-            jokeService.getJokes(1);
+        int batchSize = 10;
+
+        doThrow(new RuntimeException("API not available"))
+                .when(restTemplate).getForEntity("https://official-joke-api.appspot.com/random_joke", JokeDto.class);
+
+        assertThrows(JokeFetchException.class, () -> {
+            jokeService.fetchJokesInBatch(batchSize);
         });
-        assertEquals("Server not available. Try again later.", exception.getMessage());
-    }
-
-    @Test
-    public void testGetJokesById_JokeFound() {
-        Long jokeId = 1L;
-        Joke mockJoke = new Joke(jokeId, "Setup 1", "Punchline 1", "type");
-        when(jokeRepository.findById(jokeId)).thenReturn(Optional.of(mockJoke));
-
-        ResponseEntity<Joke> response = jokeService.getJokesById(jokeId);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(mockJoke.getId(), response.getBody().getId());
-        assertEquals(mockJoke.getSetup(), response.getBody().getSetup());
-        assertEquals(mockJoke.getPunchline(), response.getBody().getPunchline());
-    }
-
-    @Test
-    public void testGetJokesById_JokeNotFound() {
-        Long jokeId = 1L;
-        when(jokeRepository.findById(jokeId)).thenReturn(Optional.empty());
-
-        ResponseEntity<Joke> response = jokeService.getJokesById(jokeId);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        assertNull(response.getBody());
     }
 
     @Test
     public void testGetJokes_ReturnsError_WhenCountLessThanZero()  {
-        ResponseEntity<DataDtoRes> getCount = jokeService.getJokes(0);
-        assertEquals(HttpStatus.BAD_REQUEST, getCount.getStatusCode());
+        ValidCountException thrown = assertThrows(ValidCountException.class, () -> {
+            jokeService.getJokes(0);
+        });
+        assertEquals("Count should be greater than zero", thrown.getMessage());
     }
 
+    @Test
+    void testFetchJokesInBatch_ResourceAccessException() {
+        when(restTemplate.getForEntity(anyString(), eq(JokeDto.class)))
+                .thenThrow(new ResourceAccessException("Network error"));
+
+        assertThrows(JokeFetchException.class, () -> jokeService.fetchJokesInBatch(1));
+    }
+
+    @Test
+    void testFetchJokesInBatch_RestClientException() {
+        when(restTemplate.getForEntity(anyString(), eq(JokeDto.class)))
+                .thenThrow(new RestClientException("Server error"));
+
+        assertThrows(JokeFetchException.class, () -> jokeService.fetchJokesInBatch(1));
+    }
+
+    @Test
+    void testFetchJokesInBatch_GeneralException() {
+        when(restTemplate.getForEntity(anyString(), eq(JokeDto.class)))
+                .thenThrow(new RuntimeException("Unknown error"));
+
+        assertThrows(JokeFetchException.class, () -> jokeService.fetchJokesInBatch(1));
+    }
 }

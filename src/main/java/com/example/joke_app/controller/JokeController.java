@@ -1,7 +1,6 @@
 package com.example.joke_app.controller;
 
 import com.example.joke_app.dto.DataDtoRes;
-import com.example.joke_app.model.Joke;
 import com.example.joke_app.service.JokeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -17,11 +16,6 @@ public class JokeController{
 
     @GetMapping("/jokes")
     public ResponseEntity<DataDtoRes> getJokes(@RequestParam int count) {
-        return jokeService.getJokes(count);
-    }
-
-    @GetMapping("/joke")
-    public ResponseEntity<Joke> getJokesById(@RequestParam Long id) {
-        return jokeService.getJokesById(id);
+        return ResponseEntity.ok(jokeService.getJokes(count));
     }
 }
