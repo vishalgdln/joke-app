@@ -23,7 +23,7 @@ public class JokeDatabaseService {
 
         List<Joke> jokesToSave = jokesDto.stream()
                 .map(Joke::new)
-                .filter(joke -> !jokeRepository.existsById(joke.getId()))  // Assuming 'id' is the unique identifier
+                .filter(joke -> !jokeRepository.existsById(joke.getId()))
                 .toList();
 
         jokeRepository.saveAll(jokesToSave);

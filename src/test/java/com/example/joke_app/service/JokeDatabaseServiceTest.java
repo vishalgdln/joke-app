@@ -4,7 +4,6 @@ import com.example.joke_app.Repo.JokeRepository;
 import com.example.joke_app.dto.JokeDto;
 import com.example.joke_app.exception.GlobalExceptionHandler;
 import com.example.joke_app.exception.InvalidJokeException;
-import com.example.joke_app.exception.ValidCountException;
 import com.example.joke_app.model.Joke;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -58,7 +56,6 @@ class JokeDatabaseServiceTest {
     @Test
     void testSaveJokes_ShouldNotSaveToRepository_WhenJokesDtoListIsNull() {
         List<JokeDto> jokesDto = null;
-        //jokeDatabaseService.saveJokes(jokesDto);
 
         InvalidJokeException thrown = assertThrows(InvalidJokeException.class,
                 () -> jokeDatabaseService.saveJokes(jokesDto));
@@ -67,14 +64,11 @@ class JokeDatabaseServiceTest {
 
     @Test
     void testInvalidJokeExceptionHandlerDirectly() {
-        // Arrange
         GlobalExceptionHandler exceptionHandler = new GlobalExceptionHandler();
         InvalidJokeException exception = new InvalidJokeException("No jokes to save");
 
-        // Act
         ResponseEntity<String> response = exceptionHandler.invalidJokeException(exception);
 
-        // Assert
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
         assertEquals("No Content: No jokes to save", response.getBody());
     }
